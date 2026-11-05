@@ -16,7 +16,7 @@ En el repositorio puedes abrir `dist/actividad.html`. Para el análisis sin repu
 1. Instala Python 3 desde [python.org](https://www.python.org/downloads/) si no lo tienes.
 2. En la carpeta descomprimida abre `iniciar-mac.command` en macOS o `iniciar-windows.bat` en Windows. El lanzador abre el navegador. También puedes ejecutar `python3 iniciar_actividad.py` desde Terminal en macOS/Linux, o `py -3 iniciar_actividad.py` en Windows. En el checkout de desarrollo puedes usar `python3 local/iniciar_actividad.py` después de compilar.
 3. Mantén abierta la ventana del lanzador. Marca **Consultar reputación de IP con AbuseIPDB** e introduce la clave en el campo de contraseña de la página; no en Terminal.
-4. Ajusta el límite de consultas (100 por defecto) y el período de informes (90 días por defecto). Carga tus archivos y genera el informe.
+4. Al pegar la clave aparece un aviso junto al campo: indica si el lanzador está conectado y qué paso falta. Pegarla no inicia peticiones ni valida la clave. Selecciona tus archivos, ajusta el límite de consultas (100 por defecto) y el período de informes (90 días por defecto), y pulsa **Generar informe y consultar IP**. La autenticación se comprueba al consultar la primera IP pública.
 5. El Excel añade una tercera hoja, **Reputación IP**. Cierra el lanzador con Ctrl+C al terminar.
 
 Si macOS no permite abrir el archivo `.command`, ejecuta `python3 iniciar_actividad.py` desde Terminal dentro de la carpeta descomprimida. No es necesario desactivar las protecciones de macOS. Para el lanzador estándar se recomienda Python 3.8 o superior; las pruebas se ejecutan en Python 3.12.
