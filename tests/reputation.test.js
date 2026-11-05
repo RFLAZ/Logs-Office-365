@@ -1,0 +1,50 @@
+const {test}=require('node:test');
+const assert=require('node:assert/strict');
+const {parseIP,collectIPs,reputationSheet}=require('../src/reputation');
+const {workbook}=require('../src/xlsx');
+const ExcelJS=require('exceljs');
+const event=(ip,user='ana@example.test')=>({values:['',user,'Login',ip]});
+const ok=(ip,score=25,remaining=10)=>({ok:true,status:200,json:async()=>({data:{ipAddress:ip,abuseConfidenceScore:score,totalReports:7,numDistinctUsers:3,isp:'Example',countryCode:'ES',isWhitelisted:false},remaining})});
+test('IPv4, IPv6, ports and mapped addresses normalize without querying local ranges',()=>{
+ assert.equal(parseIP('8.8.8.8:443').ip,'8.8.8.8');
+ assert.equal(parseIP('[2606:4700:4700::1111]:443').ip,'2606:4700:4700::1111');
+ assert.equal(parseIP('::ffff:8.8.8.8').ip,'8.8.8.8');
+ for(const ip of ['127.0.0.1','10.1.2.3','192.168.1.1','169.254.1.2','100.64.1.1','192.0.2.1','224.0.0.1','::1','fe80::1','2001:db8::1','unknown','0x08080808'])assert.equal(parseIP(ip).isPublic,false,ip);
+});
+test('one request per unique public IP; no log records or user identifiers sent',async()=>{
+ const calls=[];
+ const events=[event('8.8.8.8'),event('8.8.8.8:443','bob@example.test'),event('::ffff:8.8.8.8'),event('10.0.0.1')];
+ const ips=collectIPs(events);assert.equal(ips.find(i=>i.ip==='8.8.8.8').events,3);
+ const sheet=await reputationSheet(events,{key:'test-key',fetcher:async(url,options)=>{calls.push({url,body:JSON.parse(options.body)});return ok('8.8.8.8');}});
+ assert.equal(calls.length,1);assert.equal(calls[0].url,'/api/abuseipdb/check');
+ assert.deepEqual(Object.keys(calls[0].body).sort(),['apiKey','ipAddress','maxAgeInDays']);
+ assert.equal(sheet.success,1);assert.equal(sheet.rows.length,2);
+ const privateRow=sheet.rows.find(r=>r.get('IP')==='10.0.0.1');
+ assert.equal(privateRow.get('Estado de consulta'),'No consultada');assert.equal(privateRow.get('Puntuación AbuseIPDB (0–100)'),'');
+ assert.ok(!JSON.stringify([...sheet.rows.map(r=>[...r])]).includes('test-key'));
+ const book=new ExcelJS.Workbook();await book.xlsx.load(Buffer.from(await workbook({sheets:[sheet]})));
+ assert.equal(book.worksheets[0].name,'Reputación IP');
+});
+test('report limit and provider quota stop remaining queries without inventing scores',async()=>{
+ let calls=0;
+ const sheet=await reputationSheet([event('1.1.1.1'),event('8.8.8.8')],{key:'test',limit:1,fetcher:async()=>{calls++;return ok('1.1.1.1',0);}});
+ assert.equal(calls,1);assert.equal(sheet.rows[0].get('Puntuación AbuseIPDB (0–100)'),0);
+ assert.equal(sheet.rows[1].get('Estado de consulta'),'No consultada');
+ const quota=await reputationSheet([event('1.1.1.1'),event('8.8.8.8')],{key:'test',fetcher:async()=>ok('1.1.1.1',0,0)});
+ assert.equal(quota.attempted,1);assert.equal(quota.success,1);
+});
+test('401 and 429 stop further requests and preserve all IP rows',async()=>{
+ for(const status of [401,429]){
+  let calls=0;const sheet=await reputationSheet([event('1.1.1.1'),event('8.8.8.8')],{key:'test',fetcher:async()=>{calls++;return {ok:false,status,json:async()=>({})};}});
+  assert.equal(calls,1);assert.equal(sheet.rows.length,2);assert.equal(sheet.rows[0].get('Estado de consulta'),'Error');assert.equal(sheet.rows[1].get('Estado de consulta'),'No consultada');
+ }
+});
+test('cancellation, network failures and malformed results retain an honest report',async()=>{
+ const controller=new AbortController();controller.abort();
+ const cancelled=await reputationSheet([event('8.8.8.8')],{key:'test',signal:controller.signal,fetcher:()=>{throw Error('must not fetch');}});
+ assert.equal(cancelled.attempted,0);assert.equal(cancelled.rows[0].get('Estado de consulta'),'No consultada');
+ const broken=await reputationSheet([event('8.8.8.8')],{key:'test',fetcher:async()=>({ok:true,json:async()=>({data:{ipAddress:'8.8.8.8'}})})});
+ assert.equal(broken.success,0);assert.equal(broken.rows[0].get('Puntuación AbuseIPDB (0–100)'),'');
+ const network=await reputationSheet([event('8.8.8.8')],{key:'test',fetcher:async()=>{throw Error('network');}});
+ assert.equal(network.rows[0].get('Estado de consulta'),'Error');
+});

@@ -1,6 +1,6 @@
 # Office 365 · Actividad por usuario
 
-Herramienta independiente del conversor CSV → XLSX. Acepta CSV originales o los XLSX generados por el conversor y produce un único informe Excel, con todos los eventos ordenados cronológicamente. Funciona localmente y sin conexión en Windows, macOS o Linux.
+Herramienta independiente del conversor CSV → XLSX. Acepta CSV originales o los XLSX generados por el conversor y produce un único informe Excel, con todos los eventos ordenados cronológicamente. El análisis de archivos funciona localmente y sin conexión en Windows, macOS o Linux. La consulta opcional de reputación con AbuseIPDB requiere Internet y Python 3.
 
 ## Descargar y abrir
 
@@ -9,7 +9,25 @@ Herramienta independiente del conversor CSV → XLSX. Acepta CSV originales o lo
 3. Selecciona uno o varios CSV o XLSX. Pulsa **Generar tabla de actividad**.
 4. Descarga `actividad_office365.xlsx`.
 
-En el repositorio puedes abrir `dist/actividad.html`. No necesitas Python, Node.js, acceso a Microsoft 365 ni subir tus archivos a un servidor.
+En el repositorio puedes abrir `dist/actividad.html`. Para el análisis sin reputación no necesitas Python, Node.js, acceso a Microsoft 365 ni subir tus archivos a un servidor.
+
+## Reputación de IP con AbuseIPDB (opcional)
+
+1. Instala Python 3 desde [python.org](https://www.python.org/downloads/) si no lo tienes.
+2. En la carpeta descomprimida abre `iniciar-mac.command` en macOS o `iniciar-windows.bat` en Windows. El lanzador abre el navegador. También puedes ejecutar `python3 iniciar_actividad.py` desde Terminal en macOS/Linux, o `py -3 iniciar_actividad.py` en Windows. En el checkout de desarrollo puedes usar `python3 local/iniciar_actividad.py` después de compilar.
+3. Mantén abierta la ventana del lanzador. Marca **Consultar reputación de IP con AbuseIPDB** e introduce la clave en el campo de contraseña de la página; no en Terminal.
+4. Ajusta el límite de consultas (100 por defecto) y el período de informes (90 días por defecto). Carga tus archivos y genera el informe.
+5. El Excel añade una tercera hoja, **Reputación IP**. Cierra el lanzador con Ctrl+C al terminar.
+
+Si macOS no permite abrir el archivo `.command`, ejecuta `python3 iniciar_actividad.py` desde Terminal dentro de la carpeta descomprimida. No es necesario desactivar las protecciones de macOS. Para el lanzador estándar se recomienda Python 3.8 o superior; las pruebas se ejecutan en Python 3.12.
+
+La aplicación consulta una vez cada IP pública distinta de todos los archivos seleccionados. Normaliza IPv4 con puerto, IPv6 entre corchetes e IPv4 mapeada en IPv6 para evitar consultas duplicadas. No consulta direcciones privadas, reservadas o inválidas. La cuenta de eventos y usuarios asociados se calcula localmente.
+
+**Datos enviados:** únicamente cada IP pública a consultar y la clave para autenticar la petición ante AbuseIPDB. No se envían usuarios, acciones, archivos ni logs completos. El navegador envía la petición al lanzador en `127.0.0.1`; este llama exclusivamente a `https://api.abuseipdb.com/api/v2/check`, con verificación TLS activa. La clave viaja en la cabecera `Key` hacia AbuseIPDB, nunca en la URL. No se guarda en archivos, almacenamiento del navegador, registros del servidor ni en el Excel. El campo se vacía al terminar cada ejecución.
+
+**Límites y fallos:** el límite es por informe, no la cuota diaria de tu cuenta. Se respeta el agotamiento de cuota indicado por el proveedor. Un error de autenticación, cuota o conexión detiene las consultas restantes; el informe se genera con lo obtenido y cada IP indica si fue consultada, omitida, cancelada o falló. Puedes pulsar **Cancelar consultas y generar informe**. No hay reintentos automáticos que consuman más cuota.
+
+La hoja incluye puntuación de confianza de abuso (0–100), número de informes e informantes, última notificación, país, ISP, dominio, tipo de uso, lista blanca y fecha de consulta. Una celda de puntuación vacía significa que no hay resultado, no una puntuación cero. Es reputación actual basada en el período seleccionado; no reconstruye la reputación que tenía la IP en la fecha del evento. Una puntuación cero no acredita que una IP sea segura.
 
 ## Hojas del informe
 
@@ -43,4 +61,4 @@ npm run package
 
 `src/activity.js` extrae y resume los eventos; `src/activity-reader.js` lee XLSX de forma incremental; `src/activity-app.js` controla la interfaz. Comparten con el conversor el lector CSV y el escritor XLSX, sin añadir la tabla de actividad a las descargas del conversor.
 
-Se validó en Chromium la carga y descarga a partir del CSV UAL original completo y de su XLSX: ambos generan la misma actividad para los 50.000 eventos, con las fechas ordenadas y el resumen sumando 50.000. No se observaron errores JavaScript ni peticiones externas. Las pruebas automáticas cubren selección de campos, datos ausentes, SignIns, orden temporal, ambas codificaciones de texto XLSX, fechas numéricas, varias hojas y estructura del informe. Ningún log, identidad de usuario ni informe con datos reales se distribuye en los ZIP ni en el repositorio.
+Se validó en Chromium la carga y descarga a partir del CSV UAL original completo y de su XLSX: ambos generan la misma actividad para los 50.000 eventos, con las fechas ordenadas y el resumen sumando 50.000. No se observaron errores JavaScript ni peticiones externas. La integración de AbuseIPDB se valida con respuestas simuladas, sin clave real ni consultas al proveedor: IP únicas, exclusión de rangos no públicos, clave inválida, cuota, cancelación y generación de la tercera hoja. No se ha verificado una consulta real autenticada a AbuseIPDB en este entorno. Las pruebas automáticas cubren selección de campos, datos ausentes, SignIns, orden temporal, ambas codificaciones de texto XLSX, fechas numéricas, varias hojas y estructura del informe. Ningún log, identidad de usuario ni informe con datos reales se distribuye en los ZIP ni en el repositorio.

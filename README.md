@@ -4,7 +4,7 @@ Interfaz en español para convertir exportaciones UAL, Interactive SignIns, NonI
 
 ## Herramienta independiente: actividad por usuario
 
-[Descarga office365-actividad.zip](https://github.com/RFLAZ/Logs-Office-365/raw/refs/heads/main/office365-actividad.zip) para generar una tabla cronológica con usuario, acción, fecha e IP a partir de CSV o XLSX. Incluye resumen por usuario y permite combinar varios archivos. [Instrucciones de actividad](ACTIVIDAD.md). El conversor de esta página sigue generando sus columnas expandidas sin añadir informes de actividad.
+[Descarga office365-actividad.zip](https://github.com/RFLAZ/Logs-Office-365/raw/refs/heads/main/office365-actividad.zip) para generar una tabla cronológica con usuario, acción, fecha e IP a partir de CSV o XLSX. Incluye resumen por usuario y permite combinar varios archivos. Ofrece consulta opcional de reputación con AbuseIPDB mediante un lanzador local (Python 3). [Instrucciones de actividad](ACTIVIDAD.md). El conversor de esta página sigue generando sus columnas expandidas sin añadir informes de actividad.
 
 ## Uso sin instalación
 
