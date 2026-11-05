@@ -1,1 +1,19 @@
-{"name":"office365-log-converter","version":"1.0.0","private":true,"scripts":{"build":"esbuild src/app.js --bundle --platform=browser --outfile=dist/app.js --minify","test":"node --test --test-isolation=none tests/*.test.js"},"dependencies":{"exceljs":"4.4.0","fflate":"0.8.2","papaparse":"5.5.3"},"devDependencies":{"esbuild":"0.25.12"}}
+{
+  "name": "office365-log-converter",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "build": "esbuild src/app.js src/activity-app.js --bundle --platform=browser --outdir=dist --minify",
+    "test": "node --test --test-isolation=none tests/*.test.js",
+    "package": "npm run build && node scripts/package.js"
+  },
+  "dependencies": {
+    "exceljs": "4.4.0",
+    "fflate": "0.8.2",
+    "papaparse": "5.5.3",
+    "saxes": "5.0.1"
+  },
+  "devDependencies": {
+    "esbuild": "0.25.12"
+  }
+}

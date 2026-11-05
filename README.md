@@ -2,6 +2,10 @@
 
 Interfaz en español para convertir exportaciones UAL, Interactive SignIns, NonInteractive SignIns y AuthDetails en archivos Excel. Los archivos se procesan en memoria en el navegador: no hay backend, telemetría, CDN, API ni cargas a servidores.
 
+## Herramienta independiente: actividad por usuario
+
+[Descarga office365-actividad.zip](https://github.com/RFLAZ/Logs-Office-365/raw/refs/heads/main/office365-actividad.zip) para generar una tabla cronológica con usuario, acción, fecha e IP a partir de CSV o XLSX. Incluye resumen por usuario y permite combinar varios archivos. [Instrucciones de actividad](ACTIVIDAD.md). El conversor de esta página sigue generando sus columnas expandidas sin añadir informes de actividad.
+
 ## Uso sin instalación
 
 1. [Descarga el conversor ZIP](https://github.com/RFLAZ/Logs-Office-365/raw/refs/heads/main/office365-conversor.zip) y descomprímelo.
