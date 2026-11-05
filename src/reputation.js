@@ -46,7 +46,8 @@ async function reputationSheet(events,{key,limit=100,maxAge=90,signal,fetcher=fe
   if(stop){rows.push(rowFor(item,'No consultada',stop));continue;}
   attempted++;onProgress(attempted,Math.min(limit,publicCount));
   try {
-   const response=await fetcher('/api/abuseipdb/check',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ipAddress:item.ip,apiKey:key,maxAgeInDays:maxAge}),signal});
+   const query=new URLSearchParams({ipAddress:item.ip,maxAgeInDays:String(maxAge)});
+   const response=await fetcher('https://api.abuseipdb.com/api/v2/check?'+query,{method:'GET',headers:{Key:key,Accept:'application/json'},credentials:'omit',referrerPolicy:'no-referrer',redirect:'error',cache:'no-store',signal});
    let body;try{body=await response.json();}catch{body={};}
    if(!response.ok) {
     const reasons={401:'Clave API no válida',403:'Acceso a AbuseIPDB denegado',429:'Cuota de AbuseIPDB agotada o demasiadas peticiones'};
@@ -59,9 +60,10 @@ async function reputationSheet(events,{key,limit=100,maxAge=90,signal,fetcher=fe
    }
    const checked=new Date().toISOString();success++;
    rows.push(rowFor(item,'Consultada',`Informes de los últimos ${maxAge} días`,data,checked));
-   if(body.remaining===0)stop='Cuota restante de AbuseIPDB agotada';
+   const remaining=response.headers?.get('X-RateLimit-Remaining');
+   if(remaining!==null && remaining!==undefined && remaining.trim()!=='' && Number(remaining)===0)stop='Cuota restante de AbuseIPDB agotada';
   } catch(error) {
-   stop=signal?.aborted || error.name==='AbortError'?'Consultas canceladas por el usuario':'Error de conexión con el lanzador local o con AbuseIPDB';
+   stop=signal?.aborted || error.name==='AbortError'?'Consultas canceladas por el usuario':'El navegador no ha podido conectar directamente con AbuseIPDB. Puede ser un bloqueo CORS del proveedor o un problema de conexión o TLS. No se han usado intermediarios; las IP sin respuesta quedan sin puntuación.';
    rows.push(rowFor(item,signal?.aborted?'Cancelada':'Error',stop));
   }
  }

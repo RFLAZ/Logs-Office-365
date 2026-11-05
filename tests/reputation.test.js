@@ -4,7 +4,7 @@ const {parseIP,collectIPs,reputationSheet}=require('../src/reputation');
 const {workbook}=require('../src/xlsx');
 const ExcelJS=require('exceljs');
 const event=(ip,user='ana@example.test')=>({values:['',user,'Login',ip]});
-const ok=(ip,score=25,remaining=10)=>({ok:true,status:200,json:async()=>({data:{ipAddress:ip,abuseConfidenceScore:score,totalReports:7,numDistinctUsers:3,isp:'Example',countryCode:'ES',isWhitelisted:false},remaining})});
+const ok=(ip,score=25,remaining=10)=>({ok:true,status:200,headers:{get:name=>name==='X-RateLimit-Remaining'?String(remaining):null},json:async()=>({data:{ipAddress:ip,abuseConfidenceScore:score,totalReports:7,numDistinctUsers:3,isp:'Example',countryCode:'ES',isWhitelisted:false},remaining})});
 test('IPv4, IPv6, ports and mapped addresses normalize without querying local ranges',()=>{
  assert.equal(parseIP('8.8.8.8:443').ip,'8.8.8.8');
  assert.equal(parseIP('[2606:4700:4700::1111]:443').ip,'2606:4700:4700::1111');
@@ -15,9 +15,15 @@ test('one request per unique public IP; no log records or user identifiers sent'
  const calls=[];
  const events=[event('8.8.8.8'),event('8.8.8.8:443','bob@example.test'),event('::ffff:8.8.8.8'),event('10.0.0.1')];
  const ips=collectIPs(events);assert.equal(ips.find(i=>i.ip==='8.8.8.8').events,3);
- const sheet=await reputationSheet(events,{key:'test-key',fetcher:async(url,options)=>{calls.push({url,body:JSON.parse(options.body)});return ok('8.8.8.8');}});
- assert.equal(calls.length,1);assert.equal(calls[0].url,'/api/abuseipdb/check');
- assert.deepEqual(Object.keys(calls[0].body).sort(),['apiKey','ipAddress','maxAgeInDays']);
+ const sheet=await reputationSheet(events,{key:'test-key',fetcher:async(url,options)=>{calls.push({url,options});return ok('8.8.8.8');}});
+ assert.equal(calls.length,1);
+ const target=new URL(calls[0].url);
+ assert.equal(target.origin,'https://api.abuseipdb.com');assert.equal(target.pathname,'/api/v2/check');
+ assert.deepEqual([...target.searchParams.keys()].sort(),['ipAddress','maxAgeInDays']);
+ assert.equal(target.searchParams.get('ipAddress'),'8.8.8.8');
+ assert.equal(calls[0].options.headers.Key,'test-key');assert.equal(calls[0].options.body,undefined);
+ assert.equal(calls[0].options.credentials,'omit');assert.equal(calls[0].options.redirect,'error');
+ assert.ok(!calls[0].url.includes('test-key'));
  assert.equal(sheet.success,1);assert.equal(sheet.rows.length,2);
  const privateRow=sheet.rows.find(r=>r.get('IP')==='10.0.0.1');
  assert.equal(privateRow.get('Estado de consulta'),'No consultada');assert.equal(privateRow.get('Puntuación AbuseIPDB (0–100)'),'');
@@ -47,4 +53,6 @@ test('cancellation, network failures and malformed results retain an honest repo
  assert.equal(broken.success,0);assert.equal(broken.rows[0].get('Puntuación AbuseIPDB (0–100)'),'');
  const network=await reputationSheet([event('8.8.8.8')],{key:'test',fetcher:async()=>{throw Error('network');}});
  assert.equal(network.rows[0].get('Estado de consulta'),'Error');
+ assert.match(network.rows[0].get('Detalle'),/CORS/);
+ assert.equal(network.rows[0].get('Puntuación AbuseIPDB (0–100)'),'');
 });
