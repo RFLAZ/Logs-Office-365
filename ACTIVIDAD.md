@@ -49,6 +49,19 @@ Puedes desmarcar la opción para incluir esos eventos. Los archivos de entrada n
 
 El informe no elimina eventos repetidos. Si cargas varios archivos se combinan todos y se ordenan por fecha globalmente. No selecciones simultáneamente un CSV y su XLSX equivalente, salvo que quieras contar ambos.
 
+## Filtrar conexiones satisfactorias de SignIns en Reputación IP
+
+La hoja **Reputación IP** incluye, después de la dirección IP:
+
+- **Estado de conexión:** el valor original del campo `Estado` del CSV de SignIns (por ejemplo, `Êxito`, `Éxito`, `Success` o `Falha`). Al cargar un XLSX de actividad se recupera de su columna `Resultado`.
+- **Conexión satisfactoria:** `Sí`, `No` o `No determinado`. Para ver solo accesos satisfactorios, usa el filtro de esta columna y selecciona **Sí**.
+
+Se crea una fila por combinación de **IP y estado de conexión**. Si una IP aparece tanto en conexiones satisfactorias como fallidas, se mantienen filas separadas; la misma respuesta de AbuseIPDB se reutiliza en todas ellas. Se hace **una única consulta por IP**, y los límites se aplican a IP distintas, no al número de filas. Las columnas `Eventos` y `Usuarios distintos` cuentan solo los registros de esa IP con ese estado.
+
+**Estado de consulta** sigue indicando el resultado de la consulta a AbuseIPDB; es independiente del éxito del inicio de sesión. Un acceso satisfactorio puede tener un error o una consulta omitida en la reputación, y se conserva el dato de conexión en esos casos. No se eliminan automáticamente los SignIns fallidos.
+
+Para UAL y AuthDetails, cuyo resultado no acredita por sí solo una conexión de SignIns completa, estas columnas indican `No aplica`. Si SignIns no incluye el estado, se muestra `No consta en el registro` y `No determinado`. Los estados desconocidos se conservan sin clasificarlos como éxito.
+
 ## Ubicación y país junto a la IP
 
 La hoja **Actividad** coloca **Ubicación**, **País** y **Origen del país** inmediatamente después de **IP**.

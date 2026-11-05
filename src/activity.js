@@ -34,14 +34,17 @@ function eventFromRow(row,context={}) {
   time=dateValue(text);
  }
  let action=String(pick('action'));
+ const file=norm(context.file || '');
  if(!action) {
-  const file=norm(context.file || '');
   if(file.includes('authdetails') || lookup.has(norm('Método de autenticação')))action='Detalle de autenticación';
   else if(file.includes('noninteractive'))action='Inicio de sesión no interactivo';
   else if(file.includes('interactive'))action='Inicio de sesión interactivo';
   else if(lookup.has(norm('AppDisplayName')) || lookup.has(norm('Aplicação')))action='Inicio de sesión (tipo no especificado)';
  }
- return {time, geography:geographyFromRow(lookup,audit), values:[Number.isFinite(time)?new Date(time).toISOString():String(rawDate),String(pick('user')),action,String(pick('ip')),String(pick('result')),String(pick('app')),String(pick('resource')),String(pick('id')),context.file || '',context.sheet || '',context.row || '']};
+ const authDetails=file.includes('authdetails') || action==='Detalle de autenticación';
+ const signIn=!authDetails && (/^Inicio de sesión(?:\s|$)/i.test(action) || file.includes('signins') || (lookup.has(norm('Estado')) && !raw));
+ const signInStatus=signIn?String(lookup.get(norm('Estado')) ?? pick('result')).trim():null;
+ return {time, signInStatus, geography:geographyFromRow(lookup,audit), values:[Number.isFinite(time)?new Date(time).toISOString():String(rawDate),String(pick('user')),action,String(pick('ip')),String(pick('result')),String(pick('app')),String(pick('resource')),String(pick('id')),context.file || '',context.sheet || '',context.row || '']};
 }
 function csvEvents(text,file) {
  const data=parseCSV(text);

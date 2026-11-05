@@ -56,3 +56,44 @@ test('TLS verification errors preserve the safe diagnostic code, without a score
  assert.equal(sheet.success,0);assert.match(sheet.rows[0].get('Detalle'),/Código de verificación TLS: 20/);
  assert.equal(sheet.rows[0].get('Puntuación AbuseIPDB (0–100)'),'');
 });
+test('SignIns reputation has one row per IP and original Estado, with one API lookup per IP',async()=>{
+ const {csvEvents,activityReport}=require('../src/activity');
+ const {xlsxEvents}=require('../src/activity-reader');
+ const Papa=require('papaparse');
+ const input=Papa.unparse([['Data (UTC)','Nome de Utilizador','Estado','Endereço IP'],['23/10/2026 12:00:00','a@example.test','Êxito','8.8.8.8'],['23/10/2026 12:01:00','b@example.test','Êxito','8.8.8.8:443'],['23/10/2026 12:02:00','a@example.test','Êxito','8.8.8.8'],['23/10/2026 12:03:00','a@example.test','Falha','8.8.8.8'],['23/10/2026 12:04:00','b@example.test','Interrompido','8.8.8.8']]);
+ const events=csvEvents(input,'InteractiveSignIns.csv');let calls=0;
+ const query=async()=>{calls++;return ok('8.8.8.8');};
+ const sheet=await reputationSheet(events,{key:'test',fetcher:query});
+ assert.equal(calls,1);assert.equal(sheet.unique,1);assert.equal(sheet.success,1);assert.equal(sheet.rows.length,3);
+ const success=sheet.rows.find(r=>r.get('Estado de conexión')==='Êxito');
+ assert.equal(success.get('Conexión satisfactoria'),'Sí');assert.equal(success.get('Eventos'),3);assert.equal(success.get('Usuarios distintos'),2);
+ for(const state of ['Falha','Interrompido']){const row=sheet.rows.find(r=>r.get('Estado de conexión')===state);assert.equal(row.get('Conexión satisfactoria'),'No');assert.equal(row.get('Eventos'),1);}
+ assert.ok(sheet.rows.every(r=>r.get('Puntuación AbuseIPDB (0–100)')===25));
+ const excel=new ExcelJS.Workbook();await excel.xlsx.load(Buffer.from(await workbook({sheets:[sheet]})));
+ assert.equal(excel.worksheets[0].getCell('C2').value,'Sí');assert.ok(excel.worksheets[0].autoFilter);
+ const report=activityReport(events);
+ const reread=await xlsxEvents(await workbook(report),'actividad.xlsx');
+ const fromXlsx=await reputationSheet(reread,{key:'test',fetcher:query});
+ assert.equal(calls,2);assert.deepEqual(fromXlsx.rows.map(r=>[r.get('Estado de conexión'),r.get('Conexión satisfactoria'),r.get('Eventos')]),sheet.rows.map(r=>[r.get('Estado de conexión'),r.get('Conexión satisfactoria'),r.get('Eventos')]));
+});
+test('unknown SignIns states and non-SignIns events are not declared successful connections',()=>{
+ const {eventFromRow}=require('../src/activity');const {connectionStatus}=require('../src/reputation');
+ const status=(value)=>eventFromRow(new Map([['Estado',value],['IP','8.8.8.8']]),{file:'NonInteractiveSignIns.csv'});
+ for(const value of ['Éxito','Success','Succeeded','Sucesso'])assert.equal(connectionStatus(status(value)).successful,'Sí');
+ for(const value of ['Error','Failure','Falha','Interrupted'])assert.equal(connectionStatus(status(value)).successful,'No');
+ assert.equal(connectionStatus(status('Pending')).successful,'No determinado');
+ assert.equal(connectionStatus(status('')).state,'No consta en el registro');
+ const ual=eventFromRow(new Map([['Operation','FileAccessed'],['ResultStatus','Success'],['IP','8.8.8.8']]),{file:'UAL.csv'});
+ assert.equal(connectionStatus(ual).successful,'No aplica');
+ const detail=eventFromRow(new Map([['Com êxito','true'],['IP','8.8.8.8']]),{file:'NonInteractiveSignIns_AuthDetails.csv'});
+ assert.equal(connectionStatus(detail).successful,'No aplica');
+});
+test('lookup failures preserve each original connection outcome and leave reputation scores empty',async()=>{
+ const {eventFromRow}=require('../src/activity');
+ const events=['Success','Failure'].map(state=>eventFromRow(new Map([['Estado',state],['IP','8.8.8.8']]),{file:'SignIns.csv'}));
+ let calls=0;
+ const sheet=await reputationSheet(events,{key:'test',fetcher:async()=>{calls++;return {ok:false,status:401,json:async()=>({})};}});
+ assert.equal(calls,1);assert.equal(sheet.rows.length,2);
+ assert.ok(sheet.rows.every(r=>r.get('Estado de consulta')==='Error' && r.get('Puntuación AbuseIPDB (0–100)')===''));
+ assert.deepEqual(sheet.rows.map(r=>r.get('Conexión satisfactoria')),['Sí','No']);
+});
