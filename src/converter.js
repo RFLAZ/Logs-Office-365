@@ -9,12 +9,32 @@ function uniqueHeaders(headers) {
     used.add(name); return name;
   });
 }
-function flatten(value, prefix, result) {
+function nestedJSON(value) {
+  let current = value;
+  for (let i = 0; i < 8 && typeof current === 'string'; i++) {
+    const text = current.trim();
+    if (!/^[{["]/.test(text)) return null;
+    try { current = JSON.parse(text); } catch { return null; }
+  }
+  return current !== null && typeof current === 'object' ? current : null;
+}
+function flatten(value, prefix, result, depth = 0) {
+  if (depth > 64) throw new Error('El JSON supera los 64 niveles de anidación admitidos. No se ha truncado el contenido.');
+  const childPath = key => `${prefix}.${key.replace(/~/g, '~0').replace(/\./g, '~1')}`;
   if (value !== null && typeof value === 'object') {
     const entries = Object.entries(value);
     if (!entries.length) result.set(prefix, JSON.stringify(value));
-    for (const [key, child] of entries) flatten(child, `${prefix}.${key.replace(/~/g, '~0').replace(/\./g, '~1')}`, result);
-  } else result.set(prefix, value === null ? '' : value);
+    for (const [key, child] of entries) flatten(child, childPath(key), result, depth + 1);
+  } else {
+    result.set(prefix, value === null ? '' : value);
+    if (typeof value === 'string') {
+      const decoded = nestedJSON(value);
+      // Preserve the encoded string at its existing path, and add its children.
+      if (decoded !== null) for (const [key, child] of Object.entries(decoded)) {
+        flatten(child, childPath(key), result, depth + 1);
+      }
+    }
+  }
 }
 function parseCSV(text) {
   const parsed = Papa.parse(text.replace(/^\uFEFF/, ''), {skipEmptyLines:'greedy'});

@@ -93,3 +93,25 @@ test('literal Excel escape sequences are escaped in the worksheet XML',async()=>
  const files=unzipSync(await workbook(data));
  assert.ok(strFromU8(files['xl/worksheets/sheet1.xml']).includes('_x005F_x0041_'));
 });
+test('UAL JSON encoded inside strings expands recursively and preserves originals',async()=>{
+ const old=JSON.stringify({settings:{enabled:false}});
+ const inner=JSON.stringify({Rules:[{Name:'Regla',Value:JSON.stringify({Scope:'local',Codes:[1,2]})}]});
+ const audit={ActivityParameters:inner,ModifiedProperties:[{Name:'Settings',OldValue:old,NewValue:'["uno","dos"]'}]};
+ const data=prepare(Papa.unparse([['CreationDate','AuditData'],['2026-10-23T12:00:00Z',JSON.stringify(audit)]]));
+ const row=data.rows[0];
+ assert.equal(row.get('AuditData.ActivityParameters'),inner);
+ assert.equal(row.get('AuditData.ActivityParameters.Rules.0.Value.Scope'),'local');
+ assert.equal(row.get('AuditData.ActivityParameters.Rules.0.Value.Codes.1'),2);
+ assert.equal(row.get('AuditData.ModifiedProperties.0.OldValue'),old);
+ assert.equal(row.get('AuditData.ModifiedProperties.0.OldValue.settings.enabled'),false);
+ assert.equal(row.get('AuditData.ModifiedProperties.0.NewValue.1'),'dos');
+ const book=new ExcelJS.Workbook();await book.xlsx.load(Buffer.from(await workbook(data)));
+ const col=data.headers.indexOf('AuditData.ActivityParameters.Rules.0.Value.Scope')+1;
+ assert.equal(book.worksheets[0].getCell(2,col).value,'local');
+});
+test('JSON-like text remains unchanged and multiply encoded objects expand',()=>{
+ const data=prepare(Papa.unparse([['AuditData'],[JSON.stringify({Text:'[ordinary text]',Empty:'{}',Encoded:JSON.stringify(JSON.stringify({Name:'ok'}))})]]));
+ assert.equal(data.rows[0].get('AuditData.Text'),'[ordinary text]');
+ assert.equal(data.rows[0].get('AuditData.Empty'),'{}');
+ assert.equal(data.rows[0].get('AuditData.Encoded.Name'),'ok');
+});
