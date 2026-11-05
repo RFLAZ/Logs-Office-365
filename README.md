@@ -21,7 +21,7 @@ También puedes abrir `dist/index.html` directamente desde el repositorio. La he
 - Conserva correos, IP, identificadores y ceros iniciales como texto. Los valores que comienzan por `=` no se convierten en fórmulas.
 - Primera fila fija, filtros y anchuras de columna ajustadas a las cabeceras.
 - Detecta UAL encapsulado en CSV de Excel separado por punto y coma. Recupera los campos y conserva todas las celdas exteriores originales en `CSVOriginal.Celdas`, para no perder contenido durante la recuperación.
-- Se conservan `AuditData` y las cadenas JSON internas originales junto a las columnas expandidas. Ver el JSON original en su columna no significa que falte expansión; las columnas nuevas aparecen a la derecha. Los objetos y listas vacíos se conservan.
+- Se conservan `AuditData` y las cadenas JSON internas originales junto a las columnas expandidas. Las columnas expandidas aparecen juntas, con fecha, operación, usuario e IP al principio del bloque AuditData y el resto agrupado por ruta. El JSON original y las cadenas JSON internas se colocan al final como referencia. Los objetos y listas vacíos se conservan.
 - JSON inválido se conserva sin expandir y se informa. CSV con filas inconsistentes se rechaza con el número de fila.
 
 ## Límites

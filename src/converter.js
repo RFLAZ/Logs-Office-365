@@ -82,6 +82,7 @@ function dateValue(value) {
 function prepare(text, {expand=true, sort='asc', dateColumn=''}={}) {
   const data = parseCSV(text); let invalidJSON=0;
   const columns = new Set(data.headers);
+  const jsonSources = new Set();
   if (expand) for (const row of data.rows) for (const header of data.headers) {
     if (data.unwrapped && header === 'CSVOriginal.Celdas') continue;
     const value = row.get(header).trim();
@@ -89,14 +90,25 @@ function prepare(text, {expand=true, sort='asc', dateColumn=''}={}) {
     let obj;
     try { obj=JSON.parse(value); } catch { invalidJSON++; continue; }
     const expanded = new Map(); flatten(obj, header, expanded);
+    jsonSources.add(header);
     for (const [key, val] of expanded) {
       // Original columns are preserved, including JSON and duplicate headers.
       let target=key;
       while (data.headers.includes(target)) target=`JSON.${target}`;
       row.set(target,val); columns.add(target);
+      if (typeof val === 'string' && nestedJSON(val) !== null) jsonSources.add(target);
     }
   }
-  data.headers=[...columns];
+  const sourceHeaders = new Set(data.headers);
+  const preferred = ['AuditData.CreationTime','AuditData.Operation','AuditData.UserId','AuditData.UserKey','AuditData.ClientIP','AuditData.Workload','AuditData.RecordType','AuditData.ResultStatus','AuditData.ObjectId'];
+  const priority = new Map(preferred.map((h,i)=>[h,i]));
+  const compare = (a,b) => (priority.get(a) ?? preferred.length) - (priority.get(b) ?? preferred.length) || a.localeCompare(b,'en',{numeric:true});
+  // Keep expanded fields together and the raw JSON references at the far right.
+  data.headers = [
+    ...data.headers.filter(h => !jsonSources.has(h)),
+    ...[...columns].filter(h => !sourceHeaders.has(h) && !jsonSources.has(h)).sort(compare),
+    ...[...columns].filter(h => jsonSources.has(h)).sort(compare)
+  ];
   const detected=data.headers.find(h=>/^(creationdate|creationtime|createddatetime|date|data(?: \(UTC\))?|fecha(?: y hora)?|date \(utc\)|created date time)$/i.test(h));
   if (dateColumn && !data.headers.includes(dateColumn)) throw new Error(`No existe la columna de fecha «${dateColumn}».`);
   const selected=dateColumn || detected;

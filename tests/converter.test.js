@@ -115,3 +115,13 @@ test('JSON-like text remains unchanged and multiply encoded objects expand',()=>
  assert.equal(data.rows[0].get('AuditData.Empty'),'{}');
  assert.equal(data.rows[0].get('AuditData.Encoded.Name'),'ok');
 });
+test('expanded JSON columns are grouped before raw JSON reference columns',async()=>{
+ const inner=JSON.stringify({Z:'last',A:'first'});
+ const data=prepare(Papa.unparse([['RecordId','AuditData'],['id',JSON.stringify({Nested:inner,Operation:'Login',ClientIP:'192.0.2.1',CreationTime:'2026-01-01T00:00:00Z'})]]));
+ assert.equal(data.headers[0],'RecordId');
+ assert.equal(data.headers[1],'AuditData.CreationTime');
+ assert.ok(data.headers.indexOf('AuditData.Nested.A')<data.headers.indexOf('AuditData.Nested.Z'));
+ for(const h of ['AuditData','AuditData.Nested'])assert.ok(data.headers.indexOf(h)>data.headers.indexOf('AuditData.Nested.Z'));
+ const book=new ExcelJS.Workbook();await book.xlsx.load(Buffer.from(await workbook(data)));
+ assert.equal(book.worksheets[0].getCell(2,data.headers.indexOf('AuditData.Nested.A')+1).value,'first');
+});
