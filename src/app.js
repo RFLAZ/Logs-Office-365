@@ -1,4 +1,4 @@
-const {prepare,workbook,batchSize}=require('./converter');
+const {prepare,workbook}=require('./converter');
 const input=document.querySelector('#files'), list=document.querySelector('#list'), button=document.querySelector('#convert');
 let files=[]; const urls=[];
 input.addEventListener('change',()=>{
@@ -20,18 +20,14 @@ button.addEventListener('click',async()=>{
       const encoding=document.querySelector('#encoding').value;
       const text=new TextDecoder(encoding,{fatal:true}).decode(bytes);
       const data=prepare(text,{expand:document.querySelector('#expand').checked,sort:document.querySelector('#sort').value,dateColumn:document.querySelector('#date').value.trim()});
-      const size=batchSize(data), parts=Math.ceil(data.rows.length/size);
-      for (let part=0; part<parts; part++) {
-        status.textContent=`Generando XLSX ${part+1} de ${parts}…`;
-        await new Promise(resolve=>setTimeout(resolve,30));
-        const output=await workbook({...data, rows:data.rows.slice(part*size,(part+1)*size)});
-        const url=URL.createObjectURL(new Blob([output],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'})); urls.push(url);
-        const link=document.createElement('a');link.href=url;
-        link.download=file.name.replace(/\.csv$/i,'')+'_ordenado'+(parts>1?`_parte_${String(part+1).padStart(2,'0')}`:'')+'.xlsx';
-        link.textContent=parts>1?`Descargar parte ${part+1} de ${parts}`:'Descargar XLSX';link.className='download';
-        link.style.margin='4px';article.append(link);
-      }
-      status.textContent=`${data.rows.length.toLocaleString('es')} registros · ${data.headers.length} columnas · ${parts} XLSX. `+(data.unwrapped?'Se recuperaron las columnas del CSV UAL encapsulado. ':'')+(data.dateColumn?`Fecha: ${data.dateColumn}. `:'No se detectó columna de fecha: se conserva el orden. ')+(data.invalidJSON?`${data.invalidJSON} campos JSON inválidos conservados sin expandir. `:'')+(data.invalidDates?`${data.invalidDates} fechas vacías o no reconocidas, al final.`:'');
+      status.textContent='Generando un único XLSX…';
+      await new Promise(resolve=>setTimeout(resolve,30));
+      const output=await workbook(data,(done,total)=>{status.textContent=`Generando un único XLSX: ${Math.round(done/total*100)} %`;});
+      const url=URL.createObjectURL(new Blob([output],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'})); urls.push(url);
+      const link=document.createElement('a');link.href=url;
+      link.download=file.name.replace(/\.csv$/i,'')+'_ordenado.xlsx';
+      link.textContent='Descargar XLSX';link.className='download';article.append(link);
+      status.textContent=`${data.rows.length.toLocaleString('es')} registros · ${data.headers.length} columnas · 1 XLSX. `+(data.unwrapped?'Se recuperaron las columnas del CSV UAL encapsulado. ':'')+(data.dateColumn?`Fecha: ${data.dateColumn}. `:'No se detectó columna de fecha: se conserva el orden. ')+(data.invalidJSON?`${data.invalidJSON} campos JSON inválidos conservados sin expandir. `:'')+(data.invalidDates?`${data.invalidDates} fechas vacías o no reconocidas, al final.`:'');
 
     } catch(error) {status.textContent=`No se pudo convertir: ${error.message}`;article.className='error';}
   }

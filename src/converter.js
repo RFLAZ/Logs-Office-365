@@ -1,6 +1,5 @@
 const Papa = require('papaparse');
-const ExcelJS = require('exceljs');
-const MAX_ROWS = 1048575;
+const {workbook} = require('./xlsx');
 function uniqueHeaders(headers) {
   const used = new Set();
   return headers.map((header, i) => {
@@ -93,31 +92,4 @@ function prepare(text, {expand=true, sort='asc', dateColumn=''}={}) {
   }
   return {...data, invalidJSON, invalidDates, dateColumn:selected || ''};
 }
-async function workbook(data) {
-  if(data.headers.length>16384) throw new Error('La expansión supera las 16.384 columnas de Excel. Reduce la expansión JSON.');
-  const book=new ExcelJS.Workbook(); book.creator='Conversor local Office 365';
-  for(let offset=0;offset<data.rows.length;offset+=MAX_ROWS) {
-    const sheet=book.addWorksheet(`Registros ${Math.floor(offset/MAX_ROWS)+1}`);
-    sheet.addRow(data.headers);
-    sheet.getRow(1).font={bold:true,color:{argb:'FFFFFFFF'}};
-    sheet.getRow(1).fill={type:'pattern',pattern:'solid',fgColor:{argb:'FF173F50'}};
-    sheet.views=[{state:'frozen',ySplit:1}];
-    sheet.autoFilter={from:{row:1,column:1},to:{row:1,column:data.headers.length}};
-    const indexes = new Map(data.headers.map((header, i) => [header, i + 1]));
-    for(const row of data.rows.slice(offset,offset+MAX_ROWS)) {
-      const target = sheet.addRow([]);
-      // A wide UAL is sparse: never allocate cells for absent JSON fields.
-      for (const [header, value] of row) {
-        if (value === '' || value === null || value === undefined) continue;
-        if(typeof value==='string' && value.length>32767) throw new Error(`La columna «${header}» contiene una celda de más de 32.767 caracteres. Excel no puede conservarla completa.`);
-        target.getCell(indexes.get(header)).value = value;
-      }
-    }
-    sheet.columns.forEach((col,i)=>{col.width=Math.min(48,Math.max(18,data.headers[i].length+2));});
-  }
-  return book.xlsx.writeBuffer();
-}
-function batchSize(data) {
-  return data.rows.length * data.headers.length > 5000000 ? 5000 : data.rows.length;
-}
-module.exports={uniqueHeaders, parseCSV, prepare, workbook, dateValue, batchSize};
+module.exports={uniqueHeaders, parseCSV, prepare, workbook, dateValue};

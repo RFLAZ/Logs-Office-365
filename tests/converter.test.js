@@ -13,7 +13,7 @@ test('UAL: nested JSON, arrays, Unicode, sorting and exact XLSX values',async()=
  assert.equal(data.rows[0].get('UserId'),'ana@example.test');
  assert.equal(data.rows[1].get('AuditData.Parameters.0.Name'),'José');
  assert.ok(data.headers.includes('AuditData'));
- const book=new ExcelJS.Workbook();await book.xlsx.load(await workbook(data));
+ const book=new ExcelJS.Workbook();await book.xlsx.load(Buffer.from(await workbook(data)));
  const sheet=book.worksheets[0];
  const get=(name,row)=>sheet.getCell(row,data.headers.indexOf(name)+1);
  assert.equal(get('UserId',3).value,'0001234567890123456789');
@@ -53,7 +53,7 @@ test('Excel re-exported UAL: unwrap records from first cell and empty columns',a
  assert.equal(data.rows.length,1);
  assert.equal(data.rows[0].get('AuditData.Nested.Name'),'prueba;con,comas');
  assert.equal(data.dateColumn,'CreationDate');
- const book=new ExcelJS.Workbook();await book.xlsx.load(await workbook(data));
+ const book=new ExcelJS.Workbook();await book.xlsx.load(Buffer.from(await workbook(data)));
  assert.equal(book.worksheets[0].rowCount,2);
 });
 test('do not discard nonempty columns when UAL-looking header is present',()=>{
@@ -72,16 +72,24 @@ test('re-exported UAL split at semicolons retains exact source cells',()=>{
  assert.equal(data.rows[0].get('AuditData.Name'),'one;two');
  assert.deepEqual(JSON.parse(data.rows[0].get('CSVOriginal.Celdas')),cells);
 });
-test('large wide UAL is split into bounded batches',()=>{
- const {batchSize}=require('../src/converter');
- assert.equal(batchSize({rows:{length:50000},headers:{length:1579}}),5000);
- assert.equal(batchSize({rows:{length:66},headers:{length:233}}),66);
-});
 test('sparse workbook preserves blank columns, numbers and false values',async()=>{
  const data={headers:['A','B','C','D'],rows:[new Map([['A','text'],['C',0],['D',false]])]};
- const book=new ExcelJS.Workbook();await book.xlsx.load(await workbook(data));
+ const book=new ExcelJS.Workbook();await book.xlsx.load(Buffer.from(await workbook(data)));
  assert.equal(book.worksheets[0].getCell('A2').value,'text');
  assert.equal(book.worksheets[0].getCell('B2').value,null);
  assert.equal(book.worksheets[0].getCell('C2').value,0);
  assert.equal(book.worksheets[0].getCell('D2').value,false);
+});
+test('incremental XLSX preserves XML symbols and line breaks',async()=>{
+ const value='  <tag> & "texto"\r\nJosé  ';
+ const data={headers:['Texto'],rows:[new Map([['Texto',value]])]};
+ const book=new ExcelJS.Workbook();await book.xlsx.load(Buffer.from(await workbook(data)));
+ assert.equal(book.worksheets[0].getCell('A2').value,value);
+});
+
+test('literal Excel escape sequences are escaped in the worksheet XML',async()=>{
+ const {unzipSync,strFromU8}=require('fflate');
+ const data={headers:['Text'],rows:[new Map([['Text','_x0041_']])]};
+ const files=unzipSync(await workbook(data));
+ assert.ok(strFromU8(files['xl/worksheets/sheet1.xml']).includes('_x005F_x0041_'));
 });
