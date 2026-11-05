@@ -27,6 +27,32 @@ def request(body=None, origin='http://127.0.0.1:1234', host='127.0.0.1:1234'):
 
 
 class LocalServerTests(unittest.TestCase):
+    def setUp(self):
+        server.trusted_ssl_context.cache_clear()
+
+    def tearDown(self):
+        server.trusted_ssl_context.cache_clear()
+
+    def test_minimal_python_ca_store_is_supplemented_without_disabling_verification(self):
+        context = server.ssl.SSLContext(server.ssl.PROTOCOL_TLS_CLIENT)
+        initial = context.cert_store_stats()['x509_ca']
+        # Managed test runtimes may inject one proxy CA into a fresh context.
+        self.assertLess(initial, 100)
+        with patch.object(server.ssl, 'create_default_context', return_value=context):
+            result = server.trusted_ssl_context()
+        self.assertIs(result, context)
+        self.assertGreaterEqual(result.cert_store_stats()['x509_ca'], initial + 100)
+        self.assertEqual(result.verify_mode, server.ssl.CERT_REQUIRED)
+        self.assertTrue(result.check_hostname)
+        self.assertIs(server.trusted_ssl_context(), result)
+
+    def test_invalid_bundled_roots_fail_closed_before_any_network_request(self):
+        with patch.object(server, 'load_assets', return_value={'cacert.pem': b'not a certificate'}), patch.object(server.urllib.request, 'build_opener') as opener:
+            status, body = server.query_abuseipdb('8.8.8.8', 'test-only-key', 90)
+        self.assertEqual(status, 502)
+        self.assertEqual(body['code'], 'TLS_ERROR')
+        opener.assert_not_called()
+
     def test_only_public_ips_from_same_origin_reach_provider(self):
         with patch.object(server, 'query_abuseipdb', return_value=(200, {'data': {}})) as call:
             good = request()
@@ -69,11 +95,14 @@ class LocalServerTests(unittest.TestCase):
 
     def test_tls_failures_are_diagnosed_without_disabling_verification(self):
         opener = Mock()
-        opener.open.side_effect = urllib.error.URLError(server.ssl.SSLCertVerificationError('certificate'))
+        problem = server.ssl.SSLCertVerificationError('certificate')
+        problem.verify_code = 20
+        opener.open.side_effect = urllib.error.URLError(problem)
         with patch.object(server.urllib.request, 'build_opener', return_value=opener):
             status, body = server.query_abuseipdb('8.8.8.8', 'test-only-key', 90)
         self.assertEqual(status, 502)
         self.assertEqual(body['code'], 'TLS_ERROR')
+        self.assertEqual(body['verifyCode'], 20)
         self.assertNotIn('test-only-key', json.dumps(body))
 
     def test_key_newlines_and_invalid_period_are_rejected(self):

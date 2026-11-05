@@ -6,6 +6,7 @@ No API key, log file or provider response is stored on disk or written to logs.
 import argparse
 import base64
 import io
+from functools import lru_cache
 import zipfile
 import ipaddress
 import json
@@ -36,14 +37,26 @@ class NoRedirect(urllib.request.HTTPRedirectHandler):
         return None
 
 
+@lru_cache(maxsize=1)
+def trusted_ssl_context():
+    # Keep configured system trust, and supplement it with the verified Mozilla
+    # CA bundle shipped inside the standalone script (no downloads at runtime).
+    context = ssl.create_default_context()
+    bundle = load_assets().get('cacert.pem')
+    if not bundle:
+        raise ssl.SSLError('El script no incluye su paquete de certificados raiz')
+    context.load_verify_locations(cadata=bundle.decode('ascii'))
+    return context
+
+
 def query_abuseipdb(ip, key, max_age):
     query = urllib.parse.urlencode({'ipAddress': ip, 'maxAgeInDays': max_age})
     request = urllib.request.Request(
         'https://api.abuseipdb.com/api/v2/check?' + query,
         headers={'Key': key, 'Accept': 'application/json'}, method='GET')
-    opener = urllib.request.build_opener(
-        urllib.request.HTTPSHandler(context=ssl.create_default_context()), NoRedirect())
     try:
+        opener = urllib.request.build_opener(
+            urllib.request.HTTPSHandler(context=trusted_ssl_context()), NoRedirect())
         with opener.open(request, timeout=20) as response:
             # check responses without verbose reports are small; reject oversized data.
             raw = response.read(1048577)
@@ -65,9 +78,9 @@ def query_abuseipdb(ip, key, max_age):
         return status, {'error': 'La consulta a AbuseIPDB no pudo completarse', 'code': 'UPSTREAM_HTTP'}
     except urllib.error.URLError as error:
         code = 'TLS_ERROR' if isinstance(error.reason, ssl.SSLError) else 'UPSTREAM_NETWORK'
-        return 502, {'error': 'No se pudo conectar con AbuseIPDB', 'code': code}
-    except ssl.SSLError:
-        return 502, {'error': 'No se pudo verificar la conexión HTTPS', 'code': 'TLS_ERROR'}
+        return 502, {'error': 'No se pudo conectar con AbuseIPDB', 'code': code, 'verifyCode': getattr(error.reason, 'verify_code', None) if code == 'TLS_ERROR' else None}
+    except ssl.SSLError as error:
+        return 502, {'error': 'No se pudo verificar la conexión HTTPS', 'code': 'TLS_ERROR', 'verifyCode': getattr(error, 'verify_code', None)}
     except (OSError, ValueError, TypeError, KeyError, AttributeError):
         return 502, {'error': 'Error de conexión o respuesta no válida de AbuseIPDB'}
 
@@ -151,11 +164,15 @@ class Handler(BaseHTTPRequestHandler):
 def load_assets(asset_root=None):
     if asset_root is None and EMBEDDED_ASSETS != '__ASSETS_' + 'ZIP_BASE64__':
         with zipfile.ZipFile(io.BytesIO(base64.b64decode(EMBEDDED_ASSETS, validate=True))) as archive:
-            return {name: archive.read(name) for name in ('index.html', 'activity-app.js', 'THIRD_PARTY_LICENSES.txt')}
+            return {name: archive.read(name) for name in ('index.html', 'activity-app.js', 'THIRD_PARTY_LICENSES.txt', 'cacert.pem')}
     root = Path(asset_root) if asset_root is not None else Path(__file__).resolve().parents[1] / 'dist'
     entry = 'actividad.html' if (root / 'actividad.html').is_file() else 'index.html'
     sources = {'index.html': entry, 'activity-app.js': 'activity-app.js', 'THIRD_PARTY_LICENSES.txt': 'THIRD_PARTY_LICENSES.txt'}
-    return {name: (root / source).read_bytes() for name, source in sources.items() if (root / source).is_file()}
+    assets = {name: (root / source).read_bytes() for name, source in sources.items() if (root / source).is_file()}
+    bundle = Path(__file__).resolve().parents[1] / 'vendor' / 'certifi' / 'cacert.pem'
+    if bundle.is_file():
+        assets['cacert.pem'] = bundle.read_bytes()
+    return assets
 
 
 def make_server(asset_root=None, port=0):

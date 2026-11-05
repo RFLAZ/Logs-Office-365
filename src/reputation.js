@@ -52,6 +52,7 @@ async function reputationSheet(events,{key,limit=100,maxAge=90,signal,fetcher=fe
     const reasons={401:'Clave API no válida',403:'Acceso a AbuseIPDB denegado',429:'Cuota de AbuseIPDB agotada o demasiadas peticiones'};
     const connectionErrors={TLS_ERROR:'Python no ha podido verificar el certificado HTTPS de AbuseIPDB. Revisa los certificados de tu instalación de Python; no desactives TLS.',UPSTREAM_NETWORK:'El script no ha podido conectar con AbuseIPDB. Comprueba la conexión a Internet.'};
     stop=reasons[response.status] || connectionErrors[body.code] || 'No se pudo completar la consulta. Se detienen las peticiones restantes';
+    if(body.code==='TLS_ERROR' && Number.isInteger(body.verifyCode))stop+=` Código de verificación TLS: ${body.verifyCode}.`;
     rows.push(rowFor(item,'Error',stop));continue;
    }
    const data=body.data;

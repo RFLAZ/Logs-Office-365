@@ -50,3 +50,9 @@ test('cancellation, network failures and malformed results retain an honest repo
  assert.match(network.rows[0].get('Detalle'),/script local/);
  assert.equal(network.rows[0].get('Puntuación AbuseIPDB (0–100)'),'');
 });
+
+test('TLS verification errors preserve the safe diagnostic code, without a score',async()=>{
+ const sheet=await reputationSheet([event('8.8.8.8')],{key:'test',fetcher:async()=>({ok:false,status:502,json:async()=>({code:'TLS_ERROR',verifyCode:20})})});
+ assert.equal(sheet.success,0);assert.match(sheet.rows[0].get('Detalle'),/Código de verificación TLS: 20/);
+ assert.equal(sheet.rows[0].get('Puntuación AbuseIPDB (0–100)'),'');
+});
