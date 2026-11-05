@@ -2,16 +2,21 @@ const {csvEvents,activityReport}=require('./activity');
 const {xlsxEvents}=require('./activity-reader');
 const {workbook}=require('./xlsx');
 const {reputationSheet}=require('./reputation');
-const {reputationHint}=require('./reputation-ui');
+const {checkLocalScript,reputationHint}=require('./reputation-ui');
 const input=document.querySelector('#files'),status=document.querySelector('#status'),button=document.querySelector('#analyze'),results=document.querySelector('#results');
 let url=null,queryController=null;
 const enabled=document.querySelector('#reputation'),options=document.querySelector('#reputation-options'),cancel=document.querySelector('#cancel-reputation');
 const keyInput=document.querySelector('#abuse-key'),reputationStatus=document.querySelector('#reputation-status');
+let launcher='checking',scriptCheck=0;
 function showReputationHint() {
- reputationStatus.textContent=reputationHint({keyPresent:!!keyInput.value.trim(),fileCount:input.files.length});
+ reputationStatus.textContent=reputationHint({launcher,keyPresent:!!keyInput.value.trim(),fileCount:input.files.length});
  button.textContent=enabled.checked?'Generar informe y consultar IP':'Generar tabla de actividad';
 }
-enabled.addEventListener('change',()=>{options.hidden=!enabled.checked;showReputationHint();});
+enabled.addEventListener('change',async()=>{
+ options.hidden=!enabled.checked;const attempt=++scriptCheck;
+ if(enabled.checked){launcher='checking';showReputationHint();const state=await checkLocalScript(location);if(attempt===scriptCheck){launcher=state;showReputationHint();}}
+ else showReputationHint();
+});
 keyInput.addEventListener('input',showReputationHint);
 cancel.addEventListener('click',()=>{queryController?.abort();cancel.disabled=true;});
 input.addEventListener('change',()=>{button.disabled=!input.files.length;results.replaceChildren();status.textContent=`${input.files.length} archivo(s) seleccionado(s).`;showReputationHint();if(url){URL.revokeObjectURL(url);url=null;}});
@@ -24,6 +29,8 @@ button.addEventListener('click',async()=>{
  try {
   let apiKey='';let queryLimit=100,maxAge=90;
   if(reputationEnabled) {
+   launcher=await checkLocalScript(location);showReputationHint();
+   if(launcher!=='ready')throw new Error(reputationHint({launcher,keyPresent:!!keyInput.value.trim(),fileCount:input.files.length}));
    apiKey=document.querySelector('#abuse-key').value.trim();
    queryLimit=Number(document.querySelector('#query-limit').value);maxAge=Number(document.querySelector('#max-age').value);
    if(!apiKey)throw new Error('Introduce tu clave de AbuseIPDB. No se guardará.');

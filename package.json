@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "build": "esbuild src/app.js src/activity-app.js --bundle --platform=browser --outdir=dist --minify",
-    "test": "node --test --test-isolation=none tests/*.test.js",
+    "test": "node --test --test-isolation=none tests/*.test.js && python3 -m unittest discover -s tests -p \"test_*.py\"",
     "package": "npm run build && node scripts/package.js"
   },
   "dependencies": {

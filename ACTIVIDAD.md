@@ -1,30 +1,35 @@
 # Office 365 · Actividad por usuario
 
-Herramienta independiente del conversor CSV → XLSX. Acepta CSV originales o los XLSX generados por el conversor y produce un único informe Excel, con todos los eventos ordenados cronológicamente. El análisis de archivos funciona localmente y sin conexión en Windows, macOS o Linux. La consulta opcional de reputación con AbuseIPDB requiere Internet y una clave API. Se hace directamente desde el navegador, sin instalar programas.
+Herramienta independiente del conversor CSV → XLSX. Acepta CSV originales o los XLSX generados por el conversor y produce un único informe Excel, con todos los eventos ordenados cronológicamente. El análisis de archivos funciona localmente y sin conexión en Windows, macOS o Linux. La consulta opcional de reputación con AbuseIPDB requiere Internet, Python 3 y una clave API. El script incluido abre la interfaz y realiza las consultas.
 
 ## Descargar y abrir
 
 1. [Descarga office365-actividad.zip](https://github.com/RFLAZ/Logs-Office-365/raw/refs/heads/main/office365-actividad.zip).
-2. Descomprime el ZIP y abre `index.html` con Chrome, Edge o Firefox actualizado. Mantén `activity-app.js` junto a `index.html`.
-3. Selecciona uno o varios CSV o XLSX. Pulsa **Generar tabla de actividad**.
+2. Descomprime el ZIP y ejecuta `python3 iniciar.py` para que se abra la interfaz, como se explica debajo. Si solo necesitas análisis sin reputación, puedes abrir `index.html` directamente.
+3. Selecciona uno o varios CSV o XLSX. Para reputación, activa AbuseIPDB, pega la clave y pulsa **Generar informe y consultar IP**. Sin reputación, pulsa **Generar tabla de actividad**.
 4. Descarga `actividad_office365.xlsx`.
 
 En el repositorio puedes abrir `dist/actividad.html`. Para el análisis sin reputación no necesitas Python, Node.js, acceso a Microsoft 365 ni subir tus archivos a un servidor.
 
-## Reputación de IP con AbuseIPDB (opcional)
+## Reputación de IP con AbuseIPDB
 
-1. Abre `index.html` con Chrome, Edge o Firefox actualizado.
-2. Selecciona tus CSV o XLSX y marca **Consultar reputación de IP con AbuseIPDB**.
-3. Pega tu clave en la página, ajusta el límite (100 consultas por defecto) y pulsa **Generar informe y consultar IP**.
-4. El Excel añade la hoja **Reputación IP**. No necesitas Python, Terminal, servidores ni archivos `.command`.
+El navegador no puede ejecutar un script del ordenador ni controlar las restricciones CORS del proveedor. Esta versión incluye **`iniciar.py`**, un único script Python que contiene toda la interfaz, abre el navegador y realiza las consultas para el HTML. No hay archivos `.command` y no hace falta desactivar las protecciones del Mac.
 
-Pegar la clave no inicia consultas ni consume cuota. Se comprueba al consultar la primera IP pública. Se envía directamente a `https://api.abuseipdb.com/api/v2/check` cada IP pública distinta con la clave en la cabecera `Key`, nunca en la URL. No se envían usuarios, acciones, archivos ni logs completos. No se usan proxies públicos ni servicios intermediarios. La clave no se guarda en el navegador, archivos o Excel y se borra del formulario al terminar. La conexión HTTPS mantiene la verificación TLS del navegador.
+1. Descomprime el ZIP.
+2. En Mac abre Terminal, escribe `python3 ` (con un espacio al final), arrastra `iniciar.py` desde Finder a Terminal y pulsa Intro. También puedes ejecutar `python3 iniciar.py` desde su carpeta; en Windows, `py -3 iniciar.py`. Requiere Python 3, sin paquetes adicionales.
+3. Se abre automáticamente la interfaz. Usa esa pestaña y mantén abierta la ventana de Terminal.
+4. Carga el CSV o XLSX, activa **Consultar reputación de IP con AbuseIPDB**, pega tu clave y pulsa **Generar informe y consultar IP**.
+5. Descarga el Excel con **Actividad**, **Resumen por usuario** y **Reputación IP**. Termina con Ctrl+C en Terminal cuando ya no necesites la aplicación.
 
-La conexión depende de que AbuseIPDB admita el origen del navegador mediante CORS. **No se ha podido verificar una conexión autenticada real desde este entorno.** Si el proveedor bloquea la conexión, o falla Internet/TLS, se detienen las consultas y se informa en la interfaz y en la hoja; se conserva el informe de actividad. No se presentan esas IP como seguras ni con puntuación cero. No se pide desactivar las protecciones de macOS o del navegador. Las pruebas de conexión usan respuestas simuladas que admiten CORS; no demuestran que el proveedor lo admita en producción.
+`iniciar.py` es autónomo: puedes moverlo o copiarlo a otra carpeta y seguirá funcionando sin los otros archivos del ZIP. El HTML incluido se puede abrir por separado para analizar sin reputación; no puede arrancar el script por sí solo. Si el navegador no se abre automáticamente, la dirección local aparece en Terminal. Para desarrollo puedes ejecutar `python3 local/iniciar.py` después de compilar. El script empaquetado se genera con `npm run package`.
 
-Se normalizan IPv4 con puerto, IPv6 entre corchetes e IPv4 mapeada para evitar duplicados. Se omiten IP privadas, reservadas e inválidas, y se calcula localmente su número de eventos y usuarios asociados. El límite de peticiones es por informe y no equivale a la cuota diaria de tu cuenta. Se detienen las consultas al alcanzar el límite, recibir cuota agotada (HTTP 429, o cabecera de cuota cero cuando el navegador puede leerla) o producirse un error. No hay reintentos automáticos. Puedes **Cancelar consultas y generar informe** para conservar lo ya obtenido; una petición enviada puede haber consumido cuota.
+Pegar la clave no consume cuota. La autenticación se comprueba al consultar la primera IP pública. El HTML envía las IP y la clave al script en `127.0.0.1`, y este llama a `https://api.abuseipdb.com/api/v2/check`, con verificación TLS y sin seguir redirecciones. Así la conexión con AbuseIPDB no depende de CORS. La clave va en la cabecera `Key` al proveedor, no en la URL. No se envían al proveedor usuarios, acciones, archivos ni logs completos, ni se usan proxies públicos. La clave no se guarda en el navegador, archivos, registros del script o Excel y se borra del formulario al terminar.
 
-La hoja incluye puntuación de confianza de abuso (0–100), número de informes e informantes, última notificación, país, ISP, dominio, tipo de uso, lista blanca y fecha de consulta. Puntuación vacía significa que no hay resultado, no una puntuación cero. Es reputación actual basada en el período seleccionado; no reconstruye la reputación en la fecha del evento. Una puntuación cero no acredita que una IP sea segura.
+Se normalizan IPv4 con puerto, IPv6 entre corchetes e IPv4 mapeada para evitar duplicados. Se omiten IP privadas, reservadas e inválidas, y se calcula localmente su número de eventos y usuarios asociados. El límite es por informe (100 peticiones por defecto), no la cuota diaria de tu cuenta. Se detienen las consultas al alcanzar el límite, recibir cuota agotada o producirse un error; el Excel conserva el informe y marca cada IP no consultada o fallida. No hay reintentos automáticos. Puedes **Cancelar consultas y generar informe** para conservar lo obtenido; una petición enviada puede haber consumido cuota.
+
+La hoja incluye puntuación de confianza de abuso (0–100), informes e informantes, última notificación, país, ISP, dominio, tipo de uso, lista blanca y fecha de consulta. Puntuación vacía significa que no hay resultado, no una puntuación cero. Es reputación actual basada en el período seleccionado; no reconstruye la reputación en la fecha del evento. Una puntuación cero no acredita que una IP sea segura.
+
+La integración se valida con el script real y respuestas de AbuseIPDB simuladas; no se ha usado una clave real en este entorno. Los errores de autenticación, cuota, conexión y certificados se indican sin revelar claves ni desactivar verificaciones.
 
 ## Hojas del informe
 
@@ -58,4 +63,4 @@ npm run package
 
 `src/activity.js` extrae y resume los eventos; `src/activity-reader.js` lee XLSX de forma incremental; `src/activity-app.js` controla la interfaz. Comparten con el conversor el lector CSV y el escritor XLSX, sin añadir la tabla de actividad a las descargas del conversor.
 
-Se validó en Chromium la carga y descarga a partir del CSV UAL original completo y de su XLSX: ambos generan la misma actividad para los 50.000 eventos, con las fechas ordenadas y el resumen sumando 50.000. No se observaron errores JavaScript ni peticiones externas. La integración de AbuseIPDB se valida con respuestas simuladas, sin clave real ni consultas al proveedor: IP únicas, exclusión de rangos no públicos, conexión directa, bloqueo de conexión/CORS, clave inválida, cuota, cancelación y generación de la tercera hoja. No se ha verificado una consulta real autenticada a AbuseIPDB en este entorno. Las pruebas automáticas cubren selección de campos, datos ausentes, SignIns, orden temporal, ambas codificaciones de texto XLSX, fechas numéricas, varias hojas y estructura del informe. Ningún log, identidad de usuario ni informe con datos reales se distribuye en los ZIP ni en el repositorio.
+Se validó en Chromium la carga y descarga a partir del CSV UAL original completo y de su XLSX: ambos generan la misma actividad para los 50.000 eventos, con las fechas ordenadas y el resumen sumando 50.000. No se observaron errores JavaScript ni peticiones externas. La integración de AbuseIPDB se valida con respuestas simuladas, sin clave real ni consultas al proveedor: IP únicas, exclusión de rangos no públicos, comunicación entre HTML y script local, clave inválida, cuota, cancelación y generación de la tercera hoja. No se ha verificado una consulta real autenticada a AbuseIPDB en este entorno. Las pruebas automáticas cubren selección de campos, datos ausentes, SignIns, orden temporal, ambas codificaciones de texto XLSX, fechas numéricas, varias hojas y estructura del informe. Ningún log, identidad de usuario ni informe con datos reales se distribuye en los ZIP ni en el repositorio.
