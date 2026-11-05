@@ -1,4 +1,4 @@
-const {csvEvents,activityReport}=require('./activity');
+const {csvEvents,activityReport,filterActivityEvents,filterSummary}=require('./activity');
 const {xlsxEvents}=require('./activity-reader');
 const {workbook}=require('./xlsx');
 const {reputationSheet}=require('./reputation');
@@ -6,7 +6,7 @@ const {checkLocalScript,reputationHint}=require('./reputation-ui');
 const input=document.querySelector('#files'),status=document.querySelector('#status'),button=document.querySelector('#analyze'),results=document.querySelector('#results');
 let url=null,queryController=null;
 const enabled=document.querySelector('#reputation'),options=document.querySelector('#reputation-options'),cancel=document.querySelector('#cancel-reputation');
-const keyInput=document.querySelector('#abuse-key'),reputationStatus=document.querySelector('#reputation-status');
+const keyInput=document.querySelector('#abuse-key'),reputationStatus=document.querySelector('#reputation-status'),excludeFailed=document.querySelector('#exclude-failed');
 let launcher='checking',scriptCheck=0;
 function showReputationHint() {
  reputationStatus.textContent=reputationHint({launcher,keyPresent:!!keyInput.value.trim(),fileCount:input.files.length});
@@ -24,6 +24,7 @@ button.addEventListener('click',async()=>{
  button.disabled=true;input.disabled=true;results.replaceChildren();if(url){URL.revokeObjectURL(url);url=null;}
  const reputationEnabled=enabled.checked;
  enabled.disabled=true;
+ const excludeUserLoginFailed=excludeFailed.checked;excludeFailed.disabled=true;
  options.querySelectorAll('input,select').forEach(control=>{control.disabled=true;});
  let reputationOutcome='';
  try {
@@ -47,21 +48,23 @@ button.addEventListener('click',async()=>{
   }
   if(!events.length)throw new Error('No se encontraron eventos.');
   status.textContent='Ordenando todos los eventos por fecha…';await new Promise(resolve=>setTimeout(resolve,30));
-  const report=activityReport(events);
+  const filtered=filterActivityEvents(events,{excludeUserLoginFailed});
+  const report=activityReport(filtered.events);
   let reputation=null;
   if(reputationEnabled) {
    queryController=new AbortController();cancel.hidden=false;cancel.disabled=false;
    status.textContent='Identificando IP únicas para AbuseIPDB…';
-   reputation=await reputationSheet(events,{key:apiKey,limit:queryLimit,maxAge,signal:queryController.signal,onProgress:(done,total)=>{status.textContent=`AbuseIPDB: consulta ${done} de hasta ${total}. Puedes cancelar y conservar los resultados obtenidos.`;}});
+   reputation=await reputationSheet(filtered.events,{key:apiKey,limit:queryLimit,maxAge,signal:queryController.signal,onProgress:(done,total)=>{status.textContent=`AbuseIPDB: consulta ${done} de hasta ${total}. Puedes cancelar y conservar los resultados obtenidos.`;}});
    reputationOutcome=`${reputation.success} consultas completadas de ${reputation.attempted} intentadas. ${reputation.stop || ''} La clave se ha borrado del formulario.`;
    report.sheets.push(reputation);queryController=null;cancel.hidden=true;
   }
+  report.sheets.push(filterSummary(filtered));
   const output=await workbook(report,(done,total)=>{status.textContent=`Generando informe · ${Math.round(done/total*100)} %`;});
   url=URL.createObjectURL(new Blob([output],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}));
   const link=document.createElement('a');link.href=url;link.download='actividad_office365.xlsx';link.textContent='Descargar informe de actividad';link.className='download';results.append(link);
-  status.textContent=`${report.events.toLocaleString('es')} eventos · ${report.users.toLocaleString('es')} usuarios identificados · 1 XLSX con Actividad, Resumen por usuario${reputation?' y Reputación IP':''}.`;
+  status.textContent=`${filtered.inputCount.toLocaleString('es')} eventos leídos · ${filtered.excluded.toLocaleString('es')} UserLoginFailed excluidos · ${report.events.toLocaleString('es')} eventos incluidos · ${report.users.toLocaleString('es')} usuarios identificados · 1 XLSX con Actividad, Resumen por usuario${reputation?', Reputación IP':''} y Resumen del análisis.`;
   const warning=document.createElement('p');warning.textContent=`Datos que no constan en el origen: ${report.missing.user.toLocaleString('es')} eventos sin usuario; ${report.missing.ip.toLocaleString('es')} sin IP; ${report.missing.action.toLocaleString('es')} sin acción. Fechas vacías o no reconocidas: ${report.missing.date.toLocaleString('es')} (al final de la tabla).`;results.append(warning);
   if(reputation){const note=document.createElement('p');note.textContent=`Reputación: ${reputation.success} consultas completadas de ${reputation.attempted} intentadas; ${reputation.unique} IP únicas detectadas. ${reputation.stop || ''} Consulta la hoja Reputación IP para ver las IP omitidas y los errores.`;results.append(note);}
  }catch(error){status.textContent=`No se pudo generar el informe: ${error.message}`;if(reputationEnabled)reputationOutcome=error.message;}
- finally{keyInput.value='';queryController=null;cancel.hidden=true;enabled.disabled=false;input.disabled=false;button.disabled=!input.files.length;options.querySelectorAll('input,select').forEach(control=>{control.disabled=false;});showReputationHint();if(reputationOutcome)reputationStatus.textContent=reputationOutcome;}
+ finally{keyInput.value='';queryController=null;cancel.hidden=true;enabled.disabled=false;excludeFailed.disabled=false;input.disabled=false;button.disabled=!input.files.length;options.querySelectorAll('input,select').forEach(control=>{control.disabled=false;});showReputationHint();if(reputationOutcome)reputationStatus.textContent=reputationOutcome;}
 });

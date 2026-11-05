@@ -71,4 +71,13 @@ function activityReport(events) {
  const summaryRows=[...users.values()].sort((a,b)=>a.name.localeCompare(b.name)).map(u=>new Map(summaryHeaders.map((h,i)=>[h,[u.name,u.count,u.actions.size,u.ips.size,u.first,u.last][i]])));
  return {sheets:[{name:'Actividad',headers:HEADERS,rows},{name:'Resumen por usuario',headers:summaryHeaders,rows:summaryRows}],missing,events:rows.length,users:[...users.keys()].filter(Boolean).length};
 }
-module.exports={eventFromRow,csvEvents,activityReport,relevantHeader};
+function filterActivityEvents(events,{excludeUserLoginFailed=true}={}) {
+ const included=excludeUserLoginFailed?events.filter(event=>String(event.values[2] || '').trim().toLowerCase()!=='userloginfailed'):events;
+ return {events:included,inputCount:events.length,excluded:events.length-included.length,enabled:excludeUserLoginFailed};
+}
+function filterSummary(filter) {
+ const headers=['Criterio','Valor'];
+ const entries=[['Excluir UserLoginFailed',filter.enabled?'Sí':'No'],['Eventos de entrada',filter.inputCount],['UserLoginFailed excluidos',filter.excluded],['Eventos incluidos',filter.events.length]];
+ return {name:'Resumen del análisis',headers,rows:entries.map(([criterion,value])=>new Map([[headers[0],criterion],[headers[1],value]]))};
+}
+module.exports={eventFromRow,csvEvents,activityReport,relevantHeader,filterActivityEvents,filterSummary};

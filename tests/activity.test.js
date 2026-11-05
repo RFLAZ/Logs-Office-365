@@ -56,3 +56,39 @@ test('empty or unrecognized XLSX fails with a useful error',async()=>{
  const b=new ExcelJS.Workbook();b.addWorksheet('Sheet1').addRow(['Other']);
  await assert.rejects(xlsxEvents(await b.xlsx.writeBuffer(),'empty.xlsx'),/registros/);
 });
+test('UserLoginFailed is excluded before activity counts and public IP collection; shared IPs survive',()=>{
+ const {filterActivityEvents,filterSummary}=require('../src/activity');
+ const {collectIPs}=require('../src/reputation');
+ const events=csvEvents(Papa.unparse([['RecordId','CreationDate','UserId','Operation','ClientIP'],['failed-only','2026-01-01T00:00:00Z','a','UserLoginFailed','1.1.1.1'],['shared-failed','2026-01-01T00:01:00Z','a',' userloginfailed ','8.8.8.8'],['shared-success','2026-01-01T00:02:00Z','a','UserLoggedIn','8.8.8.8'],['other','2026-01-01T00:03:00Z','b','FileAccessed','9.9.9.9']]),'ual.csv');
+ const filtered=filterActivityEvents(events);
+ assert.equal(filtered.inputCount,4);assert.equal(filtered.excluded,2);
+ assert.deepEqual(collectIPs(filtered.events).map(ip=>ip.ip),['8.8.8.8','9.9.9.9']);
+ assert.equal(activityReport(filtered.events).sheets[1].rows.find(row=>row.get('Usuario')==='a').get('Eventos'),1);
+ assert.equal(filterSummary(filtered).rows[2].get('Valor'),2);
+ const unfiltered=filterActivityEvents(events,{excludeUserLoginFailed:false});
+ assert.equal(unfiltered.excluded,0);assert.equal(collectIPs(unfiltered.events).length,3);
+ assert.equal(events.length,4); // Do not mutate the original input.
+});
+test('all failed events yield an empty but valid activity workbook and no IP requests',async()=>{
+ const {filterActivityEvents,filterSummary}=require('../src/activity');
+ const {reputationSheet}=require('../src/reputation');
+ const filtered=filterActivityEvents(csvEvents('Operation,ClientIP\nUserLoginFailed,8.8.8.8','ual.csv'));
+ let calls=0;
+ const reputation=await reputationSheet(filtered.events,{key:'test',fetcher:async()=>{calls++;throw Error('must not call');}});
+ assert.equal(calls,0);assert.equal(reputation.attempted,0);
+ const report=activityReport(filtered.events);report.sheets.push(reputation,filterSummary(filtered));
+ const book=new ExcelJS.Workbook();await book.xlsx.load(Buffer.from(await workbook(report)));
+ assert.equal(book.getWorksheet('Actividad').rowCount,1);
+ assert.equal(book.getWorksheet('Resumen del análisis').getCell('B4').value,1);
+});
+test('reading an activity report ignores reputation and summary sheets so excluded IPs cannot reappear',async()=>{
+ const {filterActivityEvents,filterSummary}=require('../src/activity');
+ const {collectIPs}=require('../src/reputation');
+ const events=csvEvents('Operation,ClientIP\nUserLoginFailed,1.1.1.1\nUserLoggedIn,8.8.8.8','ual.csv');
+ const report=activityReport(events);
+ report.sheets.push({name:'Reputación IP',headers:['IP'],rows:[new Map([['IP','1.1.1.1']]),new Map([['IP','8.8.8.8']])]});
+ report.sheets.push(filterSummary(filterActivityEvents(events)));
+ const reread=await xlsxEvents(await workbook(report),'actividad_office365.xlsx');
+ assert.equal(reread.length,2);
+ assert.deepEqual(collectIPs(filterActivityEvents(reread).events).map(ip=>ip.ip),['8.8.8.8']);
+});

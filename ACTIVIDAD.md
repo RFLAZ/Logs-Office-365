@@ -1,6 +1,6 @@
 # Office 365 · Actividad por usuario
 
-Herramienta independiente del conversor CSV → XLSX. Acepta CSV originales o los XLSX generados por el conversor y produce un único informe Excel, con todos los eventos ordenados cronológicamente. El análisis de archivos funciona localmente y sin conexión en Windows, macOS o Linux. La consulta opcional de reputación con AbuseIPDB requiere Internet, Python 3 y una clave API. El script incluido abre la interfaz y realiza las consultas.
+Herramienta independiente del conversor CSV → XLSX. Acepta CSV originales o los XLSX generados por el conversor y produce un único informe Excel, con todos los eventos incluidos ordenados cronológicamente. El análisis de archivos funciona localmente y sin conexión en Windows, macOS o Linux. La consulta opcional de reputación con AbuseIPDB requiere Internet, Python 3 y una clave API. El script incluido abre la interfaz y realiza las consultas.
 
 ## Descargar y abrir
 
@@ -31,9 +31,19 @@ La hoja incluye puntuación de confianza de abuso (0–100), informes e informan
 
 La integración se valida con el script real y respuestas de AbuseIPDB simuladas; no se ha usado una clave real en este entorno. Los errores de autenticación, cuota, conexión y certificados se indican sin revelar claves ni desactivar verificaciones.
 
+## Excluir UserLoginFailed
+
+La opción **Excluir UserLoginFailed del informe y de las consultas de IP** está activada por defecto. Se aplica después de leer todos los archivos y antes de crear la actividad, los resúmenes y la lista de IP de AbuseIPDB. Coincide únicamente con la acción `UserLoginFailed` (sin distinguir mayúsculas o espacios al principio/final), no con cualquier evento cuyo resultado indique un fallo.
+
+Una IP que solo aparece en eventos excluidos no se consulta. Si también figura en otra acción incluida, se mantiene y se consulta una sola vez; sus contadores reflejan únicamente los eventos incluidos. Se muestra el número de eventos leídos, excluidos e incluidos y se guarda en **Resumen del análisis**. Si todos los eventos se excluyen, el informe lo indica y no consume consultas de IP.
+
+Puedes desmarcar la opción para incluir esos eventos. Los archivos de entrada no se modifican; para recuperar eventos que ya no estén en un informe filtrado, carga el CSV original. Al analizar un XLSX previo se leen sus hojas de registros o actividad, sin tratar la reputación y los resúmenes como eventos nuevos.
+
 ## Hojas del informe
 
 **Actividad:** una fila por evento con fecha UTC, usuario, acción, IP, resultado, aplicación o servicio, recurso, ID del registro, archivo, hoja y fila o registro de origen. Orden ascendente de fecha, filtros y primera fila fija. Filtra la columna Usuario para ver todas las acciones de una cuenta.
+
+**Resumen del análisis:** filtro aplicado, eventos de entrada, UserLoginFailed excluidos y eventos incluidos.
 
 **Resumen por usuario:** número de eventos, acciones distintas, IP distintas, primera y última fecha. Las cuentas sin usuario identificado se agrupan en una fila separada como «No consta en el registro».
 
@@ -48,7 +58,7 @@ El informe no elimina eventos repetidos. Si cargas varios archivos se combinan t
 - AuthDetails puede contener únicamente ID de solicitud y detalles de autenticación: no se puede identificar usuario o IP si no figuran en el archivo. Esta versión no correlaciona automáticamente esos ID con otro archivo de SignIns.
 - Se preserva el valor de IP registrado, incluidos sus posibles puertos o formato IPv6.
 - Las fechas se normalizan a UTC. Fechas sin zona horaria se interpretan como UTC; fechas locales con barras, como día/mes/año. Las fechas vacías o no reconocidas conservan su texto y quedan al final.
-- Se reconocen fechas numéricas de Excel con los sistemas 1900 y 1904. Se aceptan XLSX con cadenas compartidas o en línea. Se procesan las hojas `Registros…` cuando existen, evitando contar también los resúmenes. Si no existen, se leen hojas con cabeceras reconocibles, excluyendo las llamadas `Resumen…`.
+- Se reconocen fechas numéricas de Excel con los sistemas 1900 y 1904. Se aceptan XLSX con cadenas compartidas o en línea. Se procesan las hojas `Registros…` cuando existen, evitando contar también los resúmenes. Si no existen se priorizan las hojas `Actividad…`; como alternativa se leen hojas con cabeceras reconocibles, excluyendo `Resumen…` y `Reputación IP…`.
 - No se ejecutan fórmulas ni macros. Se pueden leer resultados de fórmulas guardados en el XLSX. No se admiten XLS antiguos, XLSX cifrados ni ZIP de CSV como entrada directa.
 
 Los CSV se leen completos. Los XLSX se descomprimen y analizan por fragmentos, conservando los campos de actividad necesarios, para no cargar millones de celdas en memoria. El catálogo de cadenas compartidas, cuando existe, sí requiere memoria. Los eventos del informe y sus resúmenes se conservan en memoria para ordenar; con archivos grandes puede tardar. Los libros con más registros que el límite por hoja de Excel usan varias hojas dentro del mismo fichero.

@@ -30,7 +30,8 @@ async function xlsxEvents(input,file,onProgress=()=>{}) {
  },p=>onProgress('Leyendo estructura XLSX',p));
  if(!foundWorkbook || !sheets.length)throw new Error('El archivo no es un XLSX válido o no contiene hojas.');
  const records=sheets.filter(s=>/^Registros(?:\s|$)/i.test(s.name));
- const chosen=records.length?records:sheets.filter(s=>!/^Resumen/i.test(s.name));
+ const activity=sheets.filter(s=>/^Actividad(?:\s|$)/i.test(s.name));
+ const chosen=records.length?records:activity.length?activity:sheets.filter(s=>!/^Resumen/i.test(s.name) && !/^Reputaci[oó]n IP(?:\s|$)/i.test(s.name));
  const paths=new Map();
  for(const s of chosen){let target=rels.get(s.id);if(!target)continue;target=target.startsWith('/')?target.slice(1):'xl/'+target;const parts=[];for(const part of target.split('/')){if(part==='..')parts.pop();else if(part!=='.')parts.push(part);}paths.set(parts.join('/'),s.name);}
  const events=[];let usable=0;
