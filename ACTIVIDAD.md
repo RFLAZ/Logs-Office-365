@@ -41,13 +41,24 @@ Puedes desmarcar la opción para incluir esos eventos. Los archivos de entrada n
 
 ## Hojas del informe
 
-**Actividad:** una fila por evento con fecha UTC, usuario, acción, IP, resultado, aplicación o servicio, recurso, ID del registro, archivo, hoja y fila o registro de origen. Orden ascendente de fecha, filtros y primera fila fija. Filtra la columna Usuario para ver todas las acciones de una cuenta.
+**Actividad:** una fila por evento con fecha UTC, usuario, acción, IP, ubicación, país, origen del país, resultado, aplicación o servicio, recurso, ID del registro, archivo, hoja y fila o registro de origen. Orden ascendente de fecha, filtros y primera fila fija. Filtra la columna Usuario para ver todas las acciones de una cuenta.
 
 **Resumen del análisis:** filtro aplicado, eventos de entrada, UserLoginFailed excluidos y eventos incluidos.
 
 **Resumen por usuario:** número de eventos, acciones distintas, IP distintas, primera y última fecha. Las cuentas sin usuario identificado se agrupan en una fila separada como «No consta en el registro».
 
 El informe no elimina eventos repetidos. Si cargas varios archivos se combinan todos y se ordenan por fecha globalmente. No selecciones simultáneamente un CSV y su XLSX equivalente, salvo que quieras contar ambos.
+
+## Ubicación y país junto a la IP
+
+La hoja **Actividad** coloca **Ubicación**, **País** y **Origen del país** inmediatamente después de **IP**.
+
+- Se usa primero la ubicación presente en el propio evento: `Localização` de los CSV portugueses de SignIns, `Location`, `Ubicación`, objetos JSON de ubicación o sus columnas expandidas. Se conservan los valores de ciudad/región y se reconocen los códigos de país. Los códigos de dos letras se muestran con su nombre en español cuando el navegador lo permite.
+- En el formato habitual de SignIns `ciudad, estado/región, código de país` se conserva el texto de ubicación y se separa el país. Un texto ambiguo con solo ciudad y estado no se interpreta como un país.
+- Si falta el país y se activa AbuseIPDB, se completa únicamente con el país de las consultas ya realizadas y correctas para esa IP. No se hacen consultas adicionales ni se consume más cuota por esta columna. No se sobrescribe el país que figura en el registro.
+- **Origen del país** indica `Registro` o `AbuseIPDB`. Los datos de AbuseIPDB son actuales; el dato del registro corresponde al evento. Esta versión no obtiene ciudades de AbuseIPDB ni deduce ubicaciones físicas exactas.
+- Cuando no hay dato se muestra **No consta en el registro**. Las consultas omitidas o fallidas no aportan país. Las filas con varias IP diferentes no se enriquecen con un único país de AbuseIPDB para evitar atribuciones ambiguas.
+- Al volver a cargar un XLSX de actividad se conservan las columnas de ubicación y su origen.
 
 ## Origen de los datos
 

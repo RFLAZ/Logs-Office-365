@@ -1,6 +1,7 @@
 const {csvEvents,activityReport,filterActivityEvents,filterSummary}=require('./activity');
 const {xlsxEvents}=require('./activity-reader');
 const {workbook}=require('./xlsx');
+const {applyReputationCountries}=require('./geography');
 const {reputationSheet}=require('./reputation');
 const {checkLocalScript,reputationHint}=require('./reputation-ui');
 const input=document.querySelector('#files'),status=document.querySelector('#status'),button=document.querySelector('#analyze'),results=document.querySelector('#results');
@@ -56,6 +57,7 @@ button.addEventListener('click',async()=>{
    status.textContent='Identificando IP únicas para AbuseIPDB…';
    reputation=await reputationSheet(filtered.events,{key:apiKey,limit:queryLimit,maxAge,signal:queryController.signal,onProgress:(done,total)=>{status.textContent=`AbuseIPDB: consulta ${done} de hasta ${total}. Puedes cancelar y conservar los resultados obtenidos.`;}});
    reputationOutcome=`${reputation.success} consultas completadas de ${reputation.attempted} intentadas. ${reputation.stop || ''} La clave se ha borrado del formulario.`;
+   applyReputationCountries(report,reputation);
    report.sheets.push(reputation);queryController=null;cancel.hidden=true;
   }
   report.sheets.push(filterSummary(filtered));
